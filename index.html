@@ -224,23 +224,6 @@
             margin-top: 12px;
         }
 
-        /* API Key Section */
-        .api-section {
-            margin-bottom: 24px;
-            padding-bottom: 24px;
-            border-bottom: 1px solid #e5e5e5;
-        }
-
-        .api-section input {
-            width: 100%;
-            margin-bottom: 8px;
-        }
-
-        .api-section small {
-            font-size: 12px;
-            color: #999;
-        }
-
         /* Results Section */
         .section-header {
             display: flex;
@@ -582,12 +565,6 @@
         </section>
 
         <section class="input-card">
-            <div class="api-section">
-                <label for="apiKey">API Key</label>
-                <input type="password" id="apiKey" placeholder="Your Anthropic API key (sk-ant-...)">
-                <small>Stored locally in your browser. Never shared.</small>
-            </div>
-
             <label>Your Ingredients</label>
             <div class="ingredients-container" id="ingredients"></div>
             <div class="input-row">
@@ -647,6 +624,9 @@
     </div>
 
     <script>
+        // API Key (hardcoded)
+        const API_KEY = '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';
+
         // State
         const ingredients = [];
         let currentMeals = [];
@@ -659,7 +639,6 @@
         const submitBtn = document.getElementById('submitBtn');
         const countSpan = document.getElementById('count');
         const suggestionsDiv = document.getElementById('suggestions');
-        const apiKeyInput = document.getElementById('apiKey');
         const modalOverlay = document.getElementById('modalOverlay');
         const modalTitle = document.getElementById('modalTitle');
         const modalBody = document.getElementById('modalBody');
@@ -670,15 +649,6 @@
         const favoritesView = document.getElementById('favoritesView');
         const favoritesList = document.getElementById('favoritesList');
         const favCount = document.getElementById('favCount');
-
-        // Load saved API key
-        const savedKey = localStorage.getItem('anthropic_api_key');
-        if (savedKey) apiKeyInput.value = savedKey;
-
-        apiKeyInput.addEventListener('change', () => {
-            localStorage.setItem('anthropic_api_key', apiKeyInput.value);
-            updateUI();
-        });
 
         // Navigation
         navSuggestions.addEventListener('click', () => {
@@ -706,7 +676,7 @@
 
             countSpan.textContent = ingredients.length;
             addBtn.disabled = ingredients.length >= 4;
-            submitBtn.disabled = ingredients.length < 2 || !apiKeyInput.value;
+            submitBtn.disabled = ingredients.length < 2;
             favCount.textContent = favorites.length > 0 ? `(${favorites.length})` : '';
         }
 
@@ -832,12 +802,6 @@
         }
 
         async function getMealSuggestions() {
-            const apiKey = apiKeyInput.value.trim();
-            if (!apiKey) {
-                alert('Please enter your Anthropic API key');
-                return;
-            }
-
             suggestionsDiv.innerHTML = `
                 <div class="loading">
                     <div class="spinner"></div>
@@ -850,12 +814,12 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'x-api-key': apiKey,
+                        'x-api-key': API_KEY,
                         'anthropic-version': '2023-06-01',
                         'anthropic-dangerous-direct-browser-access': 'true'
                     },
                     body: JSON.stringify({
-                        model: 'claude-sonnet-4-20250514',
+                        model: 'claude-haiku-3-5-20241022',
                         max_tokens: 1024,
                         messages: [{
                             role: 'user',
@@ -928,19 +892,17 @@ Only respond with the JSON array, no other text.`
             `;
             modalOverlay.classList.add('show');
 
-            const apiKey = apiKeyInput.value.trim();
-
             try {
                 const response = await fetch('https://api.anthropic.com/v1/messages', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'x-api-key': apiKey,
+                        'x-api-key': API_KEY,
                         'anthropic-version': '2023-06-01',
                         'anthropic-dangerous-direct-browser-access': 'true'
                     },
                     body: JSON.stringify({
-                        model: 'claude-sonnet-4-20250514',
+                        model: 'claude-haiku-3-5-20241022',
                         max_tokens: 1024,
                         messages: [{
                             role: 'user',
