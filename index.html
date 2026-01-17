@@ -546,6 +546,100 @@
             margin-bottom: 16px;
         }
 
+        /* Shopping List */
+        .shopping-list-items {
+            background: #fff;
+            border-radius: 12px;
+            border: 1px solid #e5e5e5;
+            overflow: hidden;
+        }
+
+        .shopping-item {
+            display: flex;
+            align-items: center;
+            padding: 16px 20px;
+            border-bottom: 1px solid #f0f0f0;
+            gap: 12px;
+        }
+
+        .shopping-item:last-child {
+            border-bottom: none;
+        }
+
+        .shopping-item.checked {
+            background: #f9f9f9;
+        }
+
+        .shopping-item.checked .shopping-item-name {
+            text-decoration: line-through;
+            color: #999;
+        }
+
+        .shopping-checkbox {
+            position: relative;
+            cursor: pointer;
+        }
+
+        .shopping-checkbox input {
+            width: 22px;
+            height: 22px;
+            cursor: pointer;
+            accent-color: #d1de26;
+        }
+
+        .shopping-item-content {
+            flex: 1;
+        }
+
+        .shopping-item-name {
+            display: block;
+            font-weight: 500;
+            color: #1a1a1a;
+        }
+
+        .shopping-item-recipe {
+            font-size: 12px;
+            color: #999;
+        }
+
+        .shopping-item-remove {
+            background: none;
+            border: none;
+            color: #ccc;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 4px 8px;
+            transition: color 0.2s;
+        }
+
+        .shopping-item-remove:hover {
+            color: #ff4444;
+        }
+
+        .add-to-shopping-btn {
+            width: 100%;
+            margin-top: 20px;
+            padding: 14px;
+            background: #d1de26;
+            color: #1a1a1a;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .add-to-shopping-btn:hover {
+            background: #bfcc1f;
+        }
+
+        .add-to-shopping-btn:disabled {
+            background: #e5e5e5;
+            color: #999;
+            cursor: not-allowed;
+        }
+
         /* Hidden */
         .hidden {
             display: none !important;
@@ -575,6 +669,7 @@
             <nav class="nav">
                 <button class="nav-btn active" id="navSuggestions">Suggestions</button>
                 <button class="nav-btn" id="navFavorites">Favourites <span id="favCount"></span></button>
+                <button class="nav-btn" id="navShopping">Shopping <span id="shopCount"></span></button>
             </nav>
         </div>
     </header>
@@ -632,6 +727,20 @@
                 </div>
             </div>
         </section>
+
+        <!-- Shopping List View -->
+        <section id="shoppingView" class="hidden">
+            <div class="section-header">
+                <h2 class="section-title">Shopping List</h2>
+                <button class="btn btn-secondary" id="clearShoppingBtn" style="padding: 10px 16px; font-size: 14px;">Clear All</button>
+            </div>
+            <div id="shoppingListContainer">
+                <div class="empty-state">
+                    <div class="empty-state-icon">🛒</div>
+                    <p>Your shopping list is empty. Add items from recipes!</p>
+                </div>
+            </div>
+        </section>
     </main>
 
     <!-- Recipe Modal -->
@@ -655,6 +764,7 @@
         const ingredients = [];
         let currentMeals = [];
         let favorites = JSON.parse(localStorage.getItem('meal_favorites') || '[]');
+        let shoppingList = JSON.parse(localStorage.getItem('shopping_list') || '[]');
 
         // DOM Elements
         const ingredientsContainer = document.getElementById('ingredients');
@@ -675,6 +785,11 @@
         const favCount = document.getElementById('favCount');
         const apiKeyInput = document.getElementById('apiKey');
         const apiSection = document.getElementById('apiSection');
+        const navShopping = document.getElementById('navShopping');
+        const shoppingView = document.getElementById('shoppingView');
+        const shoppingListContainer = document.getElementById('shoppingListContainer');
+        const shopCount = document.getElementById('shopCount');
+        const clearShoppingBtn = document.getElementById('clearShoppingBtn');
 
         // Load saved API key
         const savedKey = localStorage.getItem('anthropic_api_key');
@@ -695,16 +810,37 @@
         navSuggestions.addEventListener('click', () => {
             navSuggestions.classList.add('active');
             navFavorites.classList.remove('active');
+            navShopping.classList.remove('active');
             suggestionsView.classList.remove('hidden');
             favoritesView.classList.add('hidden');
+            shoppingView.classList.add('hidden');
         });
 
         navFavorites.addEventListener('click', () => {
             navFavorites.classList.add('active');
             navSuggestions.classList.remove('active');
+            navShopping.classList.remove('active');
             favoritesView.classList.remove('hidden');
             suggestionsView.classList.add('hidden');
+            shoppingView.classList.add('hidden');
             renderFavorites();
+        });
+
+        navShopping.addEventListener('click', () => {
+            navShopping.classList.add('active');
+            navSuggestions.classList.remove('active');
+            navFavorites.classList.remove('active');
+            shoppingView.classList.remove('hidden');
+            suggestionsView.classList.add('hidden');
+            favoritesView.classList.add('hidden');
+            renderShoppingList();
+        });
+
+        clearShoppingBtn.addEventListener('click', () => {
+            shoppingList = [];
+            localStorage.setItem('shopping_list', JSON.stringify(shoppingList));
+            updateUI();
+            renderShoppingList();
         });
 
         function updateUI() {
@@ -719,6 +855,7 @@
             addBtn.disabled = ingredients.length >= 4;
             submitBtn.disabled = ingredients.length < 2 || !apiKeyInput.value;
             favCount.textContent = favorites.length > 0 ? `(${favorites.length})` : '';
+            shopCount.textContent = shoppingList.length > 0 ? `(${shoppingList.length})` : '';
         }
 
         function addIngredient() {
@@ -793,6 +930,60 @@
                                     <span class="badge">Saved</span>
                                 </div>
                             </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        // Shopping List functions
+        function addToShoppingList(items, recipeName) {
+            items.forEach(item => {
+                if (!shoppingList.some(i => i.item === item)) {
+                    shoppingList.push({ item, recipe: recipeName, checked: false });
+                }
+            });
+            localStorage.setItem('shopping_list', JSON.stringify(shoppingList));
+            updateUI();
+        }
+
+        function toggleShoppingItem(index) {
+            shoppingList[index].checked = !shoppingList[index].checked;
+            localStorage.setItem('shopping_list', JSON.stringify(shoppingList));
+            renderShoppingList();
+        }
+
+        function removeShoppingItem(index) {
+            shoppingList.splice(index, 1);
+            localStorage.setItem('shopping_list', JSON.stringify(shoppingList));
+            updateUI();
+            renderShoppingList();
+        }
+
+        function renderShoppingList() {
+            if (shoppingList.length === 0) {
+                shoppingListContainer.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">🛒</div>
+                        <p>Your shopping list is empty. Add items from recipes!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            shoppingListContainer.innerHTML = `
+                <div class="shopping-list-items">
+                    ${shoppingList.map((item, index) => `
+                        <div class="shopping-item ${item.checked ? 'checked' : ''}">
+                            <label class="shopping-checkbox">
+                                <input type="checkbox" ${item.checked ? 'checked' : ''} onchange="toggleShoppingItem(${index})">
+                                <span class="checkmark"></span>
+                            </label>
+                            <div class="shopping-item-content">
+                                <span class="shopping-item-name">${item.item}</span>
+                                <span class="shopping-item-recipe">from ${item.recipe}</span>
+                            </div>
+                            <button class="shopping-item-remove" onclick="removeShoppingItem(${index})">&times;</button>
                         </div>
                     `).join('')}
                 </div>
@@ -956,16 +1147,15 @@ Assume I have these kitchen staples: oil, butter, salt, pepper, common herbs & s
 Provide:
 1. A list of all ingredients with exact quantities for 2 servings
 2. Step-by-step cooking instructions
-3. A "you'll need to buy" list - ONLY items I'd need to get from the shop that aren't in my fridge ingredients or the staples above. For example: specific bread for a sandwich, pasta, rice, cheese, cream, specific proteins, etc. Be specific about what and why.
+3. A "you'll need to buy" list - items to get from the shop that aren't in my fridge ingredients or staples. IMPORTANT: Always suggest carbs (rice, pasta, bread, potatoes) and/or extra vegetables to make this a complete, balanced meal if not already included. Be specific with quantities.
 
 Format your response as JSON like this:
 {
   "ingredients": ["200g chicken breast", "1 tbsp olive oil", ...],
   "steps": ["Step 1 instruction", "Step 2 instruction", ...],
-  "shopping_list": ["Sub rolls - for the sandwich", "Mozzarella - for topping", ...]
+  "shopping_list": ["Sub rolls (2) - for the sandwich", "150g rice - to serve alongside", "Broccoli (1 head) - for a balanced meal", ...]
 }
 
-If no additional shopping is needed, return an empty array for shopping_list.
 Only respond with the JSON, no other text.`
                         }]
                     })
@@ -986,6 +1176,10 @@ Only respond with the JSON, no other text.`
                 }
                 const recipe = JSON.parse(jsonStr);
 
+                // Store for add to shopping list button
+                window.currentRecipeShoppingList = recipe.shopping_list || [];
+                window.currentRecipeName = meal.name;
+
                 modalBody.innerHTML = `
                     <div class="recipe-section">
                         <h3>Ingredients (serves 2)</h3>
@@ -1005,6 +1199,9 @@ Only respond with the JSON, no other text.`
                         <ul class="shopping-list">
                             ${recipe.shopping_list.map(item => `<li>${item}</li>`).join('')}
                         </ul>
+                        <button class="add-to-shopping-btn" onclick="handleAddToShoppingList()">
+                            🛒 Add All to Shopping List
+                        </button>
                     </div>
                     ` : ''}
                 `;
@@ -1015,6 +1212,18 @@ Only respond with the JSON, no other text.`
                         <strong>Error:</strong> ${error.message}
                     </div>
                 `;
+            }
+        }
+
+        function handleAddToShoppingList() {
+            if (window.currentRecipeShoppingList && window.currentRecipeShoppingList.length > 0) {
+                addToShoppingList(window.currentRecipeShoppingList, window.currentRecipeName);
+                // Update button to show it's been added
+                const btn = document.querySelector('.add-to-shopping-btn');
+                if (btn) {
+                    btn.textContent = '✓ Added to Shopping List';
+                    btn.disabled = true;
+                }
             }
         }
 
